@@ -202,39 +202,53 @@ with col1:
             default=["Monday", "Tuesday"]
         )
         
-        today = date.today()
-        start_date, end_date = st.date_input(
-            "Start and End Date Range (Inclusive)",
-            [today, today + timedelta(weeks=4)],
-        )
+        # --- Single-Day / Range Logic (REPLACES OLD DATE INPUTS) ---
+        st.markdown("##### Schedule Frequency")
+
+        is_one_time = st.checkbox("This is a one-time event (single day)")
+
+        if is_one_time:
+            # Option 1: Single Date Input
+            single_date = st.date_input("Select Event Date", value=date.today())
+            task_start_date = single_date
+            task_end_date = single_date
+            # For one-time events, the 'Days of the week' selection is ignored in the backend logic, 
+            # but we keep it available for flexibility.
+        else:
+            # Option 2: Date Range Input
+            task_start_date, task_end_date = st.date_input(
+                "Start and End Date Range (Inclusive)",
+                [date.today(), date.today() + timedelta(weeks=4)],
+            )
+        # -----------------------------------------------------------
 
         if st.form_submit_button("Add Task"):
             existing_names = [task['name'] for task in st.session_state.tasks]
             is_valid = True
             
+            # --- Validation Checks ---
             if not task_name:
-                st.error("Please enter a task name.")
-                is_valid = False
+                st.error("Please enter a task name."); is_valid = False
             
             if task_name in existing_names:
-                st.error(f"Task '{task_name}' already exists. Please use a unique name.")
-                is_valid = False
+                st.error(f"Task '{task_name}' already exists. Please use a unique name."); is_valid = False
             
             if not task_days:
-                st.error("Please select at least one day for the task.")
-                is_valid = False
-                
-            if start_date > end_date:
-                st.error("Start date must be before or the same as the end date.")
-                is_valid = False
+                st.error("Please select at least one day for the task."); is_valid = False
+            
+            # Check date logic using the final calculated variables
+            if task_start_date > task_end_date: 
+                st.error("Start date must be before or the same as the end date."); is_valid = False
 
+            # --- Append if valid ---
             if is_valid:
                 st.session_state.tasks.append({
                     "name": task_name,
                     "time": task_unit_time,
                     "days": task_days,
-                    "start": start_date,
-                    "end": end_date
+                    # CRITICAL: Use the new variables defined above
+                    "start": task_start_date, 
+                    "end": task_end_date      
                 })
                 save_tasks()
                 st.session_state.audit_ran = False
@@ -419,6 +433,7 @@ if st.session_state.audit_ran and not st.session_state.viz_df.empty:
 else:
 
     st.info("Run the audit to generate the visualization.")
+
 
 
 
