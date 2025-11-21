@@ -79,6 +79,18 @@ def load_tasks():
             return []
     return []
 
+def check_day_in_range(start_date, end_date, day_name):
+    """Checks if a specific day name exists in the date range."""
+    # Convert dates to datetime objects for accurate iteration
+    start_dt = pd.to_datetime(start_date)
+    end_dt = pd.to_datetime(end_date)
+    
+    # Generate all dates in the range
+    date_range = pd.date_range(start=start_dt, end=end_dt)
+    
+    # Check if the desired day name exists in the date range
+    return day_name in date_range.strftime('%A').tolist()
+         
 def save_tasks():
     file_path = get_user_file_path()
     data_to_save = []
@@ -214,9 +226,7 @@ with col1:
             task_end_date = single_date
             
         else:
-            # Option 2: Date Range Input (FIXED FOR INITIALIZATION CRASH)
-            
-            # Safely capture the list of dates from the widget
+            # Option 2: Date Range Input
             task_dates = st.date_input(
                 "Start and End Date Range (Inclusive)",
                 [date.today(), date.today() + timedelta(weeks=4)],
@@ -227,7 +237,6 @@ with col1:
                 task_start_date = task_dates[0]
                 task_end_date = task_dates[1]
             else:
-                # If only one date is present (on initial load), use it for both start and end
                 task_start_date = task_dates[0]
                 task_end_date = task_dates[0]
         # -----------------------------------------------------------
@@ -241,24 +250,31 @@ with col1:
             if task_name in existing_names:
                 st.error(f"Task '{task_name}' already exists. Please use a unique name."); is_valid = False
             if not task_days: st.error("Please select at least one day for the task."); is_valid = False
-            
-            # Check date logic using the final calculated variables
             if task_start_date > task_end_date: 
                 st.error("Start date must be before or the same as the end date."); is_valid = False
 
+            # --- NEW CONSISTENCY ENFORCEMENT (The Fix) ---
+            if is_valid and not is_one_time: 
+                invalid_days = []
+                for day in task_days:
+                    # Check if the selected day (e.g., Monday) actually exists in the date range
+                    if not check_day_in_range(task_start_date, task_end_date, day):
+                        invalid_days.append(day)
+                
+                if invalid_days:
+                    st.error(f"❌ Schedule Conflict: The following days do not exist between your start and end dates: {', '.join(invalid_days)}.")
+                    is_valid = False
+            # ----------------------------------------------
+            
             # --- Append if valid ---
             if is_valid:
                 st.session_state.tasks.append({
-                    "name": task_name,
-                    "time": task_unit_time,
-                    "days": task_days,
-                    "start": task_start_date, 
-                    "end": task_end_date      
+                    "name": task_name, "time": task_unit_time, "days": task_days,
+                    "start": task_start_date, "end": task_end_date      
                 })
                 save_tasks()
                 st.session_state.audit_ran = False
                 st.success(f"Task '{task_name}' ({task_unit_time}h) added.")
-
 # ==============================================================================
 # 📌 PANEL 2: Time Slicing and Audit Trigger
 # ==============================================================================
@@ -438,6 +454,7 @@ if st.session_state.audit_ran and not st.session_state.viz_df.empty:
 else:
 
     st.info("Run the audit to generate the visualization.")
+
 
 
 
