@@ -313,7 +313,7 @@ with col3:
         # 2. Iterate and display each task row (using unique keys for alignment)
         for i, task in enumerate(st.session_state.tasks):
             # REDEFINE COLUMNS INSIDE THE LOOP with a unique key
-            col_name_i, col_time_i, col_days_i, col_start_i, col_end_i, col_delete_i = st.columns([1.5, 0.5, 1.5, 1.5, 1.5, 0.5], key=f'row_{i}')
+            col_name_i, col_time_i, col_days_i, col_start_i, col_end_i, col_delete_i = st.columns([1.5, 0.5, 1.5, 1.5, 1.5, 0.5])
 
             # Task Name
             with col_name_i:
@@ -413,4 +413,5 @@ if st.session_state.audit_ran and not st.session_state.viz_df.empty:
 else:
 
     st.info("Run the audit to generate the visualization.")
+
 
