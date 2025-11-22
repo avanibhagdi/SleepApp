@@ -196,88 +196,86 @@ col1, col2, col3 = st.columns([0.8, 0.7, 1.5])
 with col1:
     st.header("1. Unit Task Time")
     
-    with st.form("task_form", clear_on_submit=True):
-        task_name = st.text_input("Task Name (e.g., Work, Commute, Hobby)")
-        
-        task_unit_time = st.number_input(
-            "Unit Task Time (Hours)", 
-            min_value=0.1, 
-            max_value=MAX_WORK_CAPACITY, 
-            value=2.0, 
-            step=0.5,
-            help="Enter time as a decimal (e.g., 1.5 for 1 hour 30 minutes)."
-        )
-        
-        task_days = st.multiselect(
-            "Which days of the week?", 
-            options=DAY_OPTIONS,
-            default=["Monday", "Tuesday"]
-        )
-        
-        # --- Single-Day / Range Logic (STABLE AND CONDITIONAL) ---
-        st.markdown("##### Schedule Frequency")
-
-        is_one_time = st.checkbox("This is a one-time event (single day)")
-
-        if is_one_time:
-            # Option 1: Single Date Input
-            single_date = st.date_input("Select Event Date", value=date.today(), key='single_date_picker')
-            task_start_date = single_date
-            task_end_date = single_date
+    # --- Checkbox to select which form to display ---
+    st.markdown("##### Schedule Frequency")
+    event_mode = st.radio("Select Schedule Type:", ("Recurring Task (Range)", "One-Time Event (Single Day)"))
+    
+    
+    # ===============================================
+    # A. RECURRING TASK FORM (For Date Ranges)
+    # ===============================================
+    if event_mode == "Recurring Task (Range)":
+        with st.form("recurring_form", clear_on_submit=True):
+            task_name = st.text_input("Task Name (e.g., Work, Commute, Hobby)", key='r_name')
+            task_unit_time = st.number_input(
+                "Unit Task Time (Hours)", min_value=0.1, max_value=MAX_WORK_CAPACITY, value=2.0, step=0.5, key='r_time'
+            )
+            task_days = st.multiselect(
+                "Which days of the week?", options=DAY_OPTIONS, default=["Monday", "Tuesday"], key='r_days'
+            )
             
-        else:
-            # Option 2: Date Range Input
+            # Stable Date Range Input
             task_dates = st.date_input(
-                "Start and End Date Range (Inclusive)",
-                [date.today(), date.today() + timedelta(weeks=4)],
-                key='range_picker'
+                "Start and End Date Range (Inclusive)", [date.today(), date.today() + timedelta(weeks=4)], key='r_dates'
             )
 
-            # CRITICAL FIX: Safely unpack the list to prevent ValueError on startup
+            # Safely unpack the list
             if len(task_dates) == 2:
                 task_start_date = task_dates[0]
                 task_end_date = task_dates[1]
             else:
-                # If only one date is present (on initial load), use it for both start and end
                 task_start_date = task_dates[0]
                 task_end_date = task_dates[0]
-        # -----------------------------------------------------------
 
-        if st.form_submit_button("Add Task"):
-            existing_names = [task['name'] for task in st.session_state.tasks]
-            is_valid = True
-            
-            # --- Validation Checks ---
-            if not task_name: st.error("Please enter a task name."); is_valid = False
-            if task_name in existing_names:
-                st.error(f"Task '{task_name}' already exists. Please use a unique name."); is_valid = False
-            if not task_days: st.error("Please select at least one day for the task."); is_valid = False
-            
-            # Check date logic using the final calculated variables
-            if task_start_date > task_end_date: 
-                st.error("Start date must be before or the same as the end date."); is_valid = False
-
-            # --- CONSISTENCY ENFORCEMENT ---
-            if is_valid and not is_one_time: 
-                invalid_days = []
-                for day in task_days:
-                    if not check_day_in_range(task_start_date, task_end_date, day):
-                        invalid_days.append(day)
+            if st.form_submit_button("Add Task (Recurring)", type="primary"):
+                existing_names = [task['name'] for task in st.session_state.tasks]
+                is_valid = True
                 
+                # --- Validation & Consistency Checks ---
+                if not task_name: st.error("Please enter a task name."); is_valid = False
+                if task_name in existing_names: st.error(f"Task '{task_name}' already exists."); is_valid = False
+                if not task_days: st.error("Please select at least one day for the task."); is_valid = False
+                if task_start_date > task_end_date: st.error("Start date must be before or the same as the end date."); is_valid = False
+
+                # NEW CONSISTENCY ENFORCEMENT 
+                invalid_days = [day for day in task_days if not check_day_in_range(task_start_date, task_end_date, day)]
                 if invalid_days:
-                    st.error(f"❌ Schedule Conflict: The following days do not exist between your start and end dates: {', '.join(invalid_days)}.")
-                    is_valid = False
-            # ----------------------------------------------
+                    st.error(f"❌ Conflict: Days do not exist in the range: {', '.join(invalid_days)}."); is_valid = False
+                
+                if is_valid:
+                    st.session_state.tasks.append({"name": task_name, "time": task_unit_time, "days": task_days, "start": task_start_date, "end": task_end_date})
+                    save_tasks(); st.session_state.audit_ran = False; st.success(f"Task '{task_name}' ({task_unit_time}h) added.")
+
+    # ===============================================
+    # B. ONE-TIME EVENT FORM
+    # ===============================================
+    else: # event_mode == "One-Time Event (Single Day)"
+        with st.form("onetime_form", clear_on_submit=True):
+            task_name = st.text_input("Task Name (e.g., Doctor Appointment)", key='o_name')
+            task_unit_time = st.number_input(
+                "Unit Task Time (Hours)", min_value=0.1, max_value=MAX_WORK_CAPACITY, value=1.0, step=0.5, key='o_time'
+            )
+            single_date = st.date_input("Select Event Date", value=date.today(), key='o_date')
             
-            # --- Append if valid ---
-            if is_valid:
-                st.session_state.tasks.append({
-                    "name": task_name, "time": task_unit_time, "days": task_days,
-                    "start": task_start_date, "end": task_end_date      
-                })
-                save_tasks()
-                st.session_state.audit_ran = False
-                st.success(f"Task '{task_name}' ({task_unit_time}h) added.")
+            # Determine day of week automatically for validation display
+            day_name = single_date.strftime('%A')
+            st.info(f"The selected day is: **{day_name}**")
+
+            if st.form_submit_button("Add Task (One-Time)", type="primary"):
+                existing_names = [task['name'] for task in st.session_state.tasks]
+                is_valid = True
+                
+                # --- Validation Checks ---
+                if not task_name: st.error("Please enter a task name."); is_valid = False
+                if task_name in existing_names: st.error(f"Task '{task_name}' already exists."); is_valid = False
+                
+                if is_valid:
+                    # Append using the single date for both start and end, and only that one day
+                    st.session_state.tasks.append({"name": task_name, "time": task_unit_time, "days": [day_name], "start": single_date, "end": single_date})
+                    save_tasks(); st.session_state.audit_ran = False; st.success(f"One-time task '{task_name}' ({task_unit_time}h) added.")
+                    
+    st.markdown("---")
+    st.caption(f"**Total Tasks Loaded:** {len(st.session_state.tasks)}")
 # ==============================================================================
 # 📌 PANEL 2: Time Slicing and Audit Trigger
 # ==============================================================================
@@ -462,6 +460,7 @@ if st.session_state.audit_ran and not st.session_state.viz_df.empty:
 else:
 
     st.info("Run the audit to generate the visualization.")
+
 
 
 
