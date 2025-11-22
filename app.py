@@ -286,28 +286,24 @@ with col1:
 with col2:
     st.header("2. Audit Period")
     
-    # Use a tuple to force the st.date_input to display two values on every rerun
+    # Use tuple to signal range preference and load current state
     audit_dates = st.date_input(
         "Select Range for Burnout Check",
-        value=(st.session_state.audit_start, st.session_state.audit_end),  # Tuple initialization
-        min_value=date(2000, 1, 1), # Added min_value to prevent browser issues on very old dates
+        value=(st.session_state.audit_start, st.session_state.audit_end), 
+        min_value=date(2000, 1, 1), 
         help="The audit will check all days from the start date through the end date (inclusive)."
     )
 
-    # --- CRITICAL FIX: Safely unpack and update session state ---
+    # --- CRITICAL FIX: Only update state when 2 dates are present ---
     if len(audit_dates) == 2:
         # If the user selects a range, save both dates
-        audit_start_new = audit_dates[0]
-        audit_end_new = audit_dates[1]
-    else:
-        # If the widget collapses or returns only one date (bug state), use the last valid start date for both
-        audit_start_new = audit_dates[0]
-        audit_end_new = audit_dates[0] 
-        
-    # Update Session State only after the check is complete
-    st.session_state.audit_start = audit_start_new
-    st.session_state.audit_end = audit_end_new
+        st.session_state.audit_start = audit_dates[0]
+        st.session_state.audit_end = audit_dates[1]
     
+    # Use the session state values (which hold the last valid range) for execution
+    audit_start = st.session_state.audit_start
+    audit_end = st.session_state.audit_end
+
     st.markdown("---")
 
     if st.button("▶️ Run Daily Audit", type="primary"):
@@ -468,6 +464,7 @@ if st.session_state.audit_ran and not st.session_state.viz_df.empty:
 else:
 
     st.info("Run the audit to generate the visualization.")
+
 
 
 
